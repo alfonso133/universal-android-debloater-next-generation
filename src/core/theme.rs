@@ -1,5 +1,5 @@
 use dark_light;
-use iced::{Color, color};
+use iced::{color, Color};
 use std::sync::LazyLock;
 
 /*
@@ -13,6 +13,8 @@ at the cost of requiring a restart to update the palette.
 */
 pub static OS_COLOR_SCHEME: LazyLock<dark_light::Mode> =
     LazyLock::new(|| dark_light::detect().unwrap_or(dark_light::Mode::Unspecified));
+
+//TODO remove Theme & co because now they are defined in iced (we can still define custom themes and should reimplement auto-switching)
 
 #[derive(Default, Debug, PartialEq, Eq, Copy, Clone)]
 /// Color scheme

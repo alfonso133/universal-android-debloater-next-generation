@@ -1,12 +1,11 @@
 use crate::core::helpers::button_primary;
 pub use crate::core::sync::Phone;
-use crate::core::theme::Theme;
 use crate::core::update::{SelfUpdateState, SelfUpdateStatus};
 pub use crate::gui::views::about::Message as AboutMessage;
 pub use crate::gui::views::list::{List as AppsView, LoadingState as ListLoadingState};
-use crate::gui::{Message, style, widgets::text};
-use iced::widget::{Space, button, container, pick_list, row, tooltip};
-use iced::{Alignment, Element, Font, Length, Renderer, alignment, font};
+use crate::gui::{style, widgets::text, Message};
+use iced::widget::{button, container, pick_list, row, tooltip, Space};
+use iced::{alignment, font, Alignment, Element, Font, Length, Renderer, Theme};
 
 /// resources/assets/icons.ttf, loaded in [`crate::gui::UadGui`]
 pub const ICONS: Font = Font {
@@ -24,12 +23,12 @@ pub fn nav_menu<'a>(
         text("\u{E900}")
             .font(ICONS)
             .width(22)
-            .horizontal_alignment(alignment::Horizontal::Center),
+            .align_x(alignment::Horizontal::Center),
     )
     .on_press(Message::RefreshButtonPressed);
 
     let apps_refresh_tooltip = tooltip(apps_refresh_btn, "Refresh apps", tooltip::Position::Bottom)
-        .style(style::Container::Tooltip)
+        .style(style::Container::Tooltip.get_style())
         .gap(4);
 
     let reboot_btn = button_primary("Reboot").on_press(Message::RebootButtonPressed);
@@ -53,9 +52,9 @@ pub fn nav_menu<'a>(
         button("Update")
             .on_press(Message::AboutAction(AboutMessage::DoSelfUpdate))
             .padding([5, 10])
-            .style(style::Button::SelfUpdate)
+            .style(style::Button::SelfUpdate.get_style())
     } else {
-        button("").height(0).width(0).style(style::Button::Hidden)
+        button("").height(0).width(0).style(style::Button::Hidden.get_style())
     };
 
     let apps_btn = button_primary("Apps").on_press(Message::AppsPress);
@@ -66,7 +65,7 @@ pub fn nav_menu<'a>(
         text("\u{E994}")
             .font(ICONS)
             .width(22)
-            .horizontal_alignment(alignment::Horizontal::Center),
+            .align_x(alignment::Horizontal::Center),
     )
     .on_press(Message::SettingsPressed);
 
@@ -88,7 +87,7 @@ pub fn nav_menu<'a>(
             settings_btn,
         ]
         .width(Length::Fill)
-        .align_items(Alignment::Center)
+        .align_y(Alignment::Center)
         .spacing(10),
         None => row![
             reboot_btn,
@@ -102,13 +101,13 @@ pub fn nav_menu<'a>(
             settings_btn,
         ]
         .width(Length::Fill)
-        .align_items(Alignment::Center)
+        .align_y(Alignment::Center)
         .spacing(10),
     };
 
     container(row)
         .width(Length::Fill)
         .padding(10)
-        .style(style::Container::Frame)
+        .style(style::Container::Frame.get_style())
         .into()
 }

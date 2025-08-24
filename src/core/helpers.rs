@@ -1,8 +1,7 @@
-use crate::core::theme::Theme;
 use crate::gui::style;
 use iced::widget::button;
 use iced::widget::button::Button;
-use iced::{Element, Renderer};
+use iced::{Element, Renderer, Theme};
 
 /// Wrapper function for `iced::widget::button` with padding and style applied
 pub fn button_primary<'a, Message>(
@@ -10,5 +9,5 @@ pub fn button_primary<'a, Message>(
 ) -> Button<'a, Message, Theme, Renderer> {
     button(content)
         .padding([5, 10])
-        .style(style::Button::Primary)
+        .style(style::Button::Primary.get_style())
 }

@@ -1,7 +1,7 @@
-use iced::advanced::widget::{self, Tree, Widget};
-use iced::advanced::{Clipboard, Layout, Shell, layout, overlay, renderer};
+use iced::advanced::widget::{Operation, Tree, Widget};
+use iced::advanced::{layout, overlay, renderer, Clipboard, Layout, Shell};
 use iced::mouse::{self, Cursor};
-use iced::{Alignment, Color, Element, Event, Length, Point, Rectangle, Size, advanced, event};
+use iced::{advanced, event, Alignment, Color, Element, Event, Length, Point, Rectangle, Size};
 
 /// A widget that centers a modal element over some base element
 pub struct Modal<'a, Message, Theme, Renderer> {
@@ -144,7 +144,7 @@ where
         state: &mut Tree,
         layout: Layout<'_>,
         renderer: &Renderer,
-        operation: &mut dyn widget::Operation<Message>,
+        operation: &mut dyn Operation,
     ) {
         self.base
             .as_widget()
@@ -253,7 +253,7 @@ where
         &mut self,
         layout: Layout<'_>,
         renderer: &Renderer,
-        operation: &mut dyn widget::Operation<Message>,
+        operation: &mut dyn Operation,
     ) {
         self.content.as_widget().operate(
             self.tree,

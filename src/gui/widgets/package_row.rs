@@ -1,12 +1,11 @@
 use crate::core::sync::Phone;
-use crate::core::theme::Theme;
 use crate::core::uad_lists::{PackageState, Removal, UadList};
 use crate::gui::style;
 use crate::gui::views::settings::Settings;
 use crate::gui::widgets::text;
 
-use iced::widget::{Space, button, checkbox, row};
-use iced::{Alignment, Command, Element, Length, Renderer, alignment};
+use iced::widget::{button, checkbox, row, Space};
+use iced::{alignment, Alignment, Element, Length, Renderer, Task, Theme};
 
 #[derive(Clone, Debug)]
 pub struct PackageRow {
@@ -47,8 +46,8 @@ impl PackageRow {
         }
     }
 
-    pub fn update(&mut self, _message: &Message) -> Command<Message> {
-        Command::none()
+    pub fn update(&mut self, _message: &Message) -> Task<Message> {
+        Task::none()
     }
 
     pub fn view(&self, settings: &Settings, _phone: &Phone) -> Element<Message, Theme, Renderer> {
@@ -66,19 +65,19 @@ impl PackageRow {
                 } else {
                     "Uninstall"
                 };
-                button_style = style::Button::UninstallPackage;
+                button_style = style::Button::UninstallPackage.get_style();
             }
             PackageState::Disabled => {
                 action_text = "Enable";
-                button_style = style::Button::RestorePackage;
+                button_style = style::Button::RestorePackage.get_style();
             }
             PackageState::Uninstalled => {
                 action_text = "Restore";
-                button_style = style::Button::RestorePackage;
+                button_style = style::Button::RestorePackage.get_style();
             }
             PackageState::All => {
                 action_text = "Error";
-                button_style = style::Button::RestorePackage;
+                button_style = style::Button::RestorePackage.get_style();
                 warn!("Incredible! Something impossible happened!");
             }
         }
@@ -89,22 +88,22 @@ impl PackageRow {
         {
             selection_checkbox = checkbox("", self.selected)
                 .on_toggle(Message::ToggleSelection)
-                .style(style::CheckBox::PackageEnabled);
+                .style(style::CheckBox::PackageEnabled.get_style());
 
             action_btn = button(
                 text(action_text)
-                    .horizontal_alignment(alignment::Horizontal::Center)
+                    .align_x(alignment::Horizontal::Center)
                     .width(100),
             )
             .on_press(Message::ActionPressed);
         } else {
             selection_checkbox = checkbox("", self.selected)
                 .on_toggle(Message::ToggleSelection)
-                .style(style::CheckBox::PackageDisabled);
+                .style(style::CheckBox::PackageDisabled.get_style());
 
             action_btn = button(
                 text(action_text)
-                    .horizontal_alignment(alignment::Horizontal::Center)
+                    .align_x(alignment::Horizontal::Center)
                     .width(100),
             );
         }
@@ -116,19 +115,19 @@ impl PackageRow {
                     text(&self.name).width(Length::FillPortion(8)),
                     action_btn.style(button_style)
                 ]
-                .align_items(Alignment::Center)
+                .align_y(Alignment::Center)
             )
             .padding(8)
             .style(if self.current {
-                style::Button::SelectedPackage
+                style::Button::SelectedPackage.get_style()
             } else {
-                style::Button::NormalPackage
+                style::Button::NormalPackage.get_style()
             })
             .width(Length::Fill)
             .on_press(Message::PackagePressed),
             Space::with_width(15)
         ]
-        .align_items(Alignment::Center)
+        .align_y(Alignment::Center)
         .into()
     }
 }

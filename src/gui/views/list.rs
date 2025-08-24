@@ -1,11 +1,10 @@
 use crate::core::config::DeviceSettings;
 use crate::core::helpers::button_primary;
-use crate::core::sync::{AdbError, Phone, User, adb_shell_command, apply_pkg_state_commands};
-use crate::core::theme::Theme;
+use crate::core::sync::{adb_shell_command, apply_pkg_state_commands, AdbError, Phone, User};
 use crate::core::uad_lists::{
-    Opposite, PackageHashMap, PackageState, Removal, UadList, UadListState, load_debloat_lists,
+    load_debloat_lists, Opposite, PackageHashMap, PackageState, Removal, UadList, UadListState,
 };
-use crate::core::utils::{EXPORT_FILE_NAME, NAME, export_selection, fetch_packages, open_url};
+use crate::core::utils::{export_selection, fetch_packages, open_url, EXPORT_FILE_NAME, NAME};
 use crate::gui::style;
 use crate::gui::widgets::navigation_menu::ICONS;
 use std::path::PathBuf;
@@ -15,10 +14,10 @@ use crate::gui::widgets::modal::Modal;
 use crate::gui::widgets::package_row::{Message as RowMessage, PackageRow};
 use crate::gui::widgets::text;
 use iced::widget::{
-    Column, Space, button, checkbox, column, container, horizontal_space, pick_list, radio, row,
-    scrollable, text_editor, text_input, tooltip, vertical_rule,
+    button, checkbox, column, container, horizontal_space, pick_list, radio, row, scrollable, text_editor,
+    text_input, tooltip, vertical_rule, Column, Space,
 };
-use iced::{Alignment, Command, Element, Length, Renderer, alignment};
+use iced::{alignment, padding, Alignment, Element, Length, Padding, Renderer, Task, Theme};
 
 #[derive(Debug, Default, Clone)]
 pub struct PackageInfo {
@@ -120,14 +119,14 @@ impl List {
         selected_device: &mut Phone,
         list_update_state: &mut UadListState,
         message: Message,
-    ) -> Command<Message> {
+    ) -> Task<Message> {
         let i_user = self.selected_user.unwrap_or_default().index;
         match message {
             Message::ModalHide => {
                 self.selection_modal = false;
                 self.error_modal = None;
                 self.export_modal = false;
-                Command::none()
+                Task::none()
             }
             Message::ModalValidate => {
                 let mut commands = vec![];
@@ -142,7 +141,7 @@ impl List {
                     ));
                 }
                 self.selection_modal = false;
-                Command::batch(commands)
+                Task::batch(commands)
             }
             Message::RestoringDevice(output) => {
                 if let Ok(p) = output {
@@ -152,7 +151,7 @@ impl List {
                 } else {
                     self.loading_state = LoadingState::RestoringDevice("Error [TODO]".to_string());
                 }
-                Command::none()
+                Task::none()
             }
             Message::LoadUadList(remote) => {
                 info!("{:-^65}", "-");
@@ -162,7 +161,7 @@ impl List {
                 );
                 info!("{:-^65}", "-");
                 self.loading_state = LoadingState::DownloadingList;
-                Command::perform(
+                Task::perform(
                     Self::init_apps_view(remote, selected_device.clone()),
                     Message::LoadPhonePackages,
                 )
@@ -171,7 +170,7 @@ impl List {
                 self.loading_state = LoadingState::LoadingPackages;
                 self.uad_lists.clone_from(&uad_list);
                 *list_update_state = list_state;
-                Command::perform(
+                Task::perform(
                     Self::load_packages(
                         uad_list,
                         selected_device.adb_id.clone(),
@@ -189,7 +188,7 @@ impl List {
                 self.selected_user = Some(User::default());
                 Self::filter_package_lists(self);
                 self.loading_state = LoadingState::Ready;
-                Command::none()
+                Task::none()
             }
             Message::ToggleAllSelected(selected) => {
                 for i in self.filtered_packages.clone() {
@@ -204,27 +203,27 @@ impl List {
                     }
                 }
                 self.all_selected = selected;
-                Command::none()
+                Task::none()
             }
             Message::SearchInputChanged(letter) => {
                 self.input_value = letter;
                 Self::filter_package_lists(self);
-                Command::none()
+                Task::none()
             }
             Message::ListSelected(list) => {
                 self.selected_list = Some(list);
                 Self::filter_package_lists(self);
-                Command::none()
+                Task::none()
             }
             Message::PackageStateSelected(package_state) => {
                 self.selected_package_state = Some(package_state);
                 Self::filter_package_lists(self);
-                Command::none()
+                Task::none()
             }
             Message::RemovalSelected(removal) => {
                 self.selected_removal = Some(removal);
                 Self::filter_package_lists(self);
-                Command::none()
+                Task::none()
             }
             Message::List(i_package, row_message) => {
                 #[expect(unused_must_use, reason = "side-effect")]
@@ -240,7 +239,7 @@ impl List {
                     RowMessage::ToggleSelection(toggle) => {
                         if package.removal == Removal::Unsafe && !settings.general.expert_mode {
                             package.selected = false;
-                            return Command::none();
+                            return Task::none();
                         }
 
                         if settings.device.multi_user_mode {
@@ -272,11 +271,11 @@ impl List {
                                     .retain(|&x| x.1 != i_package || x.0 != i_user);
                             }
                         }
-                        Command::none()
+                        Task::none()
                     }
                     RowMessage::ActionPressed => {
                         self.phone_packages[i_user][i_package].selected = true;
-                        Command::batch(build_action_pkg_commands(
+                        Task::batch(build_action_pkg_commands(
                             &self.phone_packages,
                             selected_device,
                             &settings.device,
@@ -292,19 +291,19 @@ impl List {
                             self.phone_packages[i_user][self.current_package_index].current = false;
                         }
                         self.current_package_index = i_package;
-                        Command::none()
+                        Task::none()
                     }
                 }
             }
             Message::ApplyActionOnSelection => {
                 self.selection_modal = true;
-                Command::none()
+                Task::none()
             }
             Message::UserSelected(user) => {
                 self.selected_user = Some(user);
                 self.filtered_packages = (0..self.phone_packages[user.index].len()).collect();
                 Self::filter_package_lists(self);
-                Command::none()
+                Task::none()
             }
             Message::ChangePackageState(res) => {
                 match res {
@@ -320,7 +319,7 @@ impl List {
                         self.error_modal = Some(err);
                     }
                 }
-                Command::none()
+                Task::none()
             }
             Message::ModalUserSelected(user) => {
                 self.selected_user = Some(user);
@@ -333,21 +332,21 @@ impl List {
             }
             Message::ClearSelectedPackages => {
                 self.selected_packages = Vec::new();
-                Command::none()
+                Task::none()
             }
             Message::ADBSatisfied(result) => {
                 self.is_adb_satisfied = result;
-                Command::none()
+                Task::none()
             }
             Message::UpdateFailed => {
                 self.loading_state = LoadingState::FailedToUpdate;
-                Command::none()
+                Task::none()
             }
             Message::GoToUrl(url) => {
                 open_url(url);
-                Command::none()
+                Task::none()
             }
-            Message::ExportSelection => Command::perform(
+            Message::ExportSelection => Task::perform(
                 export_selection(self.phone_packages[i_user].clone()),
                 Message::SelectionExported,
             ),
@@ -356,34 +355,34 @@ impl List {
                     Ok(_) => self.export_modal = true,
                     Err(err) => error!("Failed to export current selection: {err:?}"),
                 }
-                Command::none()
+                Task::none()
             }
-            Message::Nothing => Command::none(),
+            Message::Nothing => Task::none(),
             Message::DescriptionEdit(action) => {
                 match action {
                     text_editor::Action::Edit(_) => {
                         // Do nothing - ignore all editing operations
                     }
-                    text_editor::Action::Scroll { lines } => {}
+                    text_editor::Action::Scroll { lines: _lines } => {}
                     // Allow all other actions (movement, selection, clicking, scrolling, etc.)
                     _ => {
                         self.description_content.perform(action);
                     }
                 }
-                Command::none()
+                Task::none()
             }
             Message::CopyError(err) => {
                 self.copy_confirmation = true;
-                Command::batch(vec![
+                Task::batch(vec![
                     iced::clipboard::write::<Message>(err),
-                    Command::perform(Self::delay_hide_copy_confirmation(), |_| {
+                    Task::perform(Self::delay_hide_copy_confirmation(), |_| {
                         Message::HideCopyConfirmation
                     }),
                 ])
             }
             Message::HideCopyConfirmation => {
                 self.copy_confirmation = false;
-                Command::none()
+                Task::none()
             }
         }
     }
@@ -394,15 +393,16 @@ impl List {
         settings: &Settings,
         selected_device: &Phone,
     ) -> Element<Message, Theme, Renderer> {
+        
         match &self.loading_state {
             LoadingState::DownloadingList => waiting_view(
                 &format!("Downloading latest {NAME} lists from GitHub. Please wait..."),
                 Some(button("No internet?").on_press(Message::LoadUadList(false))),
-                style::Text::Default,
+                style::Text::Default.get_style()
             ),
             LoadingState::FindingPhones => {
                 if self.is_adb_satisfied {
-                    waiting_view("Finding connected devices...", None, style::Text::Default)
+                    waiting_view("Finding connected devices...", None, style::Text::Default.get_style())
                 } else {
                     waiting_view(
                         "ADB is not installed on your system, install ADB and relaunch application.",
@@ -410,30 +410,30 @@ impl List {
                     .on_press(Message::GoToUrl(PathBuf::from(
                         "https://github.com/Universal-Debloater-Alliance/universal-android-debloater-next-generation/wiki/Getting-started",
                     )))),
-                        style::Text::Danger,
+                        style::Text::Danger.get_style()
                     )
                 }
             }
             LoadingState::LoadingPackages => waiting_view(
                 "Pulling packages from the device. Please wait...",
                 None,
-                style::Text::Default,
+                style::Text::Default.get_style()
             ),
             LoadingState::_UpdatingUad => waiting_view(
                 &format!("Updating {NAME}. Please wait..."),
                 None,
-                style::Text::Default,
+                style::Text::Default.get_style()
             ),
             LoadingState::RestoringDevice(device) => waiting_view(
                 &format!("Restoring device: {device}"),
                 None,
-                style::Text::Default,
+                style::Text::Default.get_style()
             ),
             LoadingState::Ready => self.ready_view(settings, selected_device),
             LoadingState::FailedToUpdate => waiting_view(
                 "Failed to download update",
                 Some(button("Go back").on_press(Message::LoadUadList(false))),
-                style::Text::Danger,
+                style::Text::Danger.get_style()
             ),
         }
     }
@@ -446,7 +446,7 @@ impl List {
 
         let select_all_checkbox = checkbox("", self.all_selected)
             .on_toggle(Message::ToggleAllSelected)
-            .style(style::CheckBox::SettingsEnabled)
+            .style(style::CheckBox::SettingsEnabled.get_style())
             .spacing(0); // no label, so remove space entirely
 
         let col_sel_all = row![
@@ -459,7 +459,7 @@ impl List {
                 },
                 tooltip::Position::Top,
             )
-            .style(style::Container::Tooltip)
+            .style(style::Container::Tooltip.get_style())
             .gap(4)
         ]
         .padding(8);
@@ -493,9 +493,9 @@ impl List {
             list_picklist,
         ]
         .width(Length::Fill)
-        .align_items(Alignment::Center)
+        .align_y(Alignment::Center)
         .spacing(6)
-        .padding([0, 16, 0, 0])
+        .padding(padding::right(16))
         .into()
     }
 
@@ -505,6 +505,7 @@ impl List {
         settings: &Settings,
         selected_device: &Phone,
     ) -> Element<Message, Theme, Renderer> {
+        
         let packages = self
             .filtered_packages
             .iter()
@@ -518,17 +519,17 @@ impl List {
 
         let packages_scrollable = scrollable(packages)
             .height(Length::FillPortion(6))
-            .style(style::Scrollable::Packages);
+            .style(style::Scrollable::Packages.get_style());
 
         let description_scroll =
             scrollable(text_editor(&self.description_content).on_action(Message::DescriptionEdit))
-                .style(style::Scrollable::Description);
+                .style(style::Scrollable::Description.get_style());
 
         let description_panel = container(description_scroll)
             .padding(6)
             .height(Length::FillPortion(2))
             .width(Length::Fill)
-            .style(style::Container::Frame);
+            .style(style::Container::Frame.get_style());
 
         let review_selection = {
             let tmp_widget = text(format!(
@@ -550,7 +551,7 @@ impl List {
         if !self.selected_packages.is_empty() {
             export_selection = export_selection
                 .on_press(Message::ExportSelection)
-                .style(style::Button::Primary);
+                .style(style::Button::Primary.get_style());
         }
         // lock
         let export_selection = export_selection;
@@ -562,22 +563,22 @@ impl List {
         ]
         .width(Length::Fill)
         .spacing(10)
-        .align_items(Alignment::Center);
+        .align_y(Alignment::Center);
 
         let unavailable = container(
                     column![
                         text("ADB is not authorized to access this user!").size(20)
-                            .style(style::Text::Danger),
+                            .style(style::Text::Danger.get_style()),
                         text("The most likely reason is that it is the user of your work profile (also called Secure Folder on Samsung devices). There's really no solution, other than completely disabling your work profile in your device settings.")
-                            .style(style::Text::Commentary)
-                            .horizontal_alignment(alignment::Horizontal::Center),
+                            .style(style::Text::Commentary.get_style())
+                            .align_x(alignment::Horizontal::Center),
                     ]
                     .spacing(6)
-                    .align_items(Alignment::Center)
+                    .align_x(Alignment::Center)
                 )
                 .padding(10)
-                .center_x()
-                .style(style::Container::BorderedFrame);
+                .center_x(Length::Shrink)
+                .style(style::Container::BorderedFrame.get_style());
 
         let control_panel = self.control_panel(selected_device);
         let content = if selected_device.user_list.is_empty()
@@ -599,12 +600,12 @@ impl List {
         } else {
             column![
                 control_panel,
-                container(unavailable).height(Length::Fill).center_y(),
+                container(unavailable).center_y(Length::Fill),
             ]
         }
         .width(Length::Fill)
         .spacing(10)
-        .align_items(Alignment::Center);
+        .align_x(Alignment::Center);
 
         if self.selection_modal {
             return Modal::new(
@@ -620,18 +621,17 @@ impl List {
         }
 
         if self.export_modal {
-            let title = container(row![text("Success").size(24)].align_items(Alignment::Center))
-                .width(Length::Fill)
-                .style(style::Container::Frame)
-                .padding([10, 0, 10, 0])
-                .center_y()
-                .center_x();
+            let title = container(row![text("Success").size(24)].align_y(Alignment::Center))
+                .style(style::Container::Frame.get_style())
+                .padding([10, 0])
+                .center_y(Length::Shrink)
+                .center_x(Length::Fill);
 
             let text_box = row![
                 text(format!("Exported current selection into file.\nFile is exported in same directory where {NAME} is located.")).width(Length::Fill),
             ].padding(20);
 
-            let file_row = row![text(EXPORT_FILE_NAME).style(style::Text::Commentary)].padding(20);
+            let file_row = row![text(EXPORT_FILE_NAME).style(style::Text::Commentary.get_style())].padding(20);
 
             let modal_btn_row = row![
                 Space::new(Length::Fill, Length::Shrink),
@@ -645,7 +645,7 @@ impl List {
                 .height(Length::Shrink)
                 .width(500)
                 .padding(10)
-                .style(style::Container::Frame);
+                .style(style::Container::Frame.get_style());
 
             return Modal::new(content.padding(10), ctn)
                 .on_blur(Message::ModalHide)
@@ -694,28 +694,27 @@ impl List {
         );
 
         let title_ctn =
-            container(row![text("Review your selection").size(24)].align_items(Alignment::Center))
-                .width(Length::Fill)
-                .style(style::Container::Frame)
-                .padding([10, 0, 10, 0])
-                .center_y()
-                .center_x();
+            container(row![text("Review your selection").size(24)].align_y(Alignment::Center))
+                .style(style::Container::Frame.get_style())
+                .padding([10, 0])
+                .center_y(Length::Shrink)
+                .center_x(Length::Fill);
 
         let users_ctn = container(radio_btn_users)
             .padding(10)
-            .center_x()
-            .style(style::Container::Frame);
+            .center_x(Length::Shrink)
+            .style(style::Container::Frame.get_style());
 
         let explaination_ctn = container(
             row![
                 text("The action for the selected user will be applied to all other users")
-                    .style(style::Text::Danger),
+                    .style(style::Text::Danger.get_style()),
                 tooltip(
                     text("\u{EA0C}")
                         .font(ICONS)
                         .width(22)
-                        .horizontal_alignment(alignment::Horizontal::Center)
-                        .style(style::Text::Commentary),
+                        .align_x(alignment::Horizontal::Center)
+                        .style(style::Text::Commentary.get_style()),
                     "Let's say you choose user 0. If a selected package on user 0\n\
                         is set to be uninstalled and if this same package is disabled on user 10,\n\
                         then the package on both users will be uninstalled.",
@@ -723,20 +722,25 @@ impl List {
                 )
                 .gap(20)
                 .padding(10)
-                .style(style::Container::Tooltip)
+                .style(style::Container::Tooltip.get_style())
             ]
             .spacing(10),
         )
-        .center_x()
+        .center_x(Length::Shrink)
         .padding(10)
-        .style(style::Container::BorderedFrame);
+        .style(style::Container::BorderedFrame.get_style());
 
         let modal_btn_row = row![
             button(text("Cancel")).on_press(Message::ModalHide),
             horizontal_space(),
             button(text("Apply")).on_press(Message::ModalValidate),
         ]
-        .padding([0, 15, 10, 10]);
+        .padding(Padding {
+            top: 0.0,
+            right: 15.0,
+            bottom: 10.0,
+            left: 10.0,
+        });
 
         let recap_view = summaries
             .iter()
@@ -765,12 +769,12 @@ impl List {
                                             row![
                                                 row![text(
                                                     self.phone_packages[selection.0][selection.1]
-                                                        .removal
+                                                        .removal.to_string()
                                                 )]
                                                 .width(120),
                                                 row![text(
                                                     self.phone_packages[selection.0][selection.1]
-                                                        .uad_list
+                                                        .uad_list.to_string()
                                                 )]
                                                 .width(50),
                                                 row![text(
@@ -787,17 +791,15 @@ impl List {
                                                     PackageState::Enabled =>
                                                         if settings.device.disable_mode {
                                                             text("Disable")
-                                                                .style(style::Text::Danger)
                                                         } else {
                                                             text("Uninstall")
-                                                                .style(style::Text::Danger)
-                                                        },
+                                                        }.style(style::Text::Danger.get_style()),
                                                     PackageState::Disabled =>
-                                                        text("Enable").style(style::Text::Ok),
+                                                        text("Enable").style(style::Text::Ok.get_style()),
                                                     PackageState::Uninstalled =>
-                                                        text("Restore").style(style::Text::Ok),
+                                                        text("Restore").style(style::Text::Ok.get_style()),
                                                     PackageState::All => text("Impossible")
-                                                        .style(style::Text::Danger),
+                                                        .style(style::Text::Danger.get_style()),
                                                 },]
                                                 .width(70),
                                             ]
@@ -808,21 +810,21 @@ impl List {
                                 )
                         } else {
                             column![text("No packages selected for this user")]
-                                .align_items(Alignment::Center)
+                                .align_x(Alignment::Center)
                                 .width(Length::Fill)
                         },
                     )
                     .padding(10)
                     .width(Length::Fill),
                 )
-                .style(style::Scrollable::Description),
+                .style(style::Scrollable::Description.get_style()),
             )
             .width(Length::Fill)
-            .style(style::Container::Frame),
+            .style(style::Container::Frame.get_style()),
         )
         .width(Length::Fill)
         .max_height(150)
-        .padding([0, 10, 0, 10]);
+        .padding([0, 10]);
 
         container(
             if device.user_list.iter().filter(|&u| !u.protected).count() > 1
@@ -831,13 +833,13 @@ impl List {
                 column![
                     title_ctn,
                     users_ctn,
-                    row![explaination_ctn].padding([0, 10, 0, 10]),
+                    row![explaination_ctn].padding([0, 10]),
                     container(recap_view).padding(10),
                     selected_pkgs_ctn,
                     modal_btn_row,
                 ]
                 .spacing(10)
-                .align_items(Alignment::Center)
+                .align_x(Alignment::Center)
             } else if !settings.device.multi_user_mode {
                 column![
                     title_ctn,
@@ -847,7 +849,7 @@ impl List {
                     modal_btn_row,
                 ]
                 .spacing(10)
-                .align_items(Alignment::Center)
+                .align_x(Alignment::Center)
             } else {
                 column![
                     title_ctn,
@@ -856,13 +858,13 @@ impl List {
                     modal_btn_row,
                 ]
                 .spacing(10)
-                .align_items(Alignment::Center)
+                .align_x(Alignment::Center)
             },
         )
         .width(900)
         .height(Length::Shrink)
         .max_height(700)
-        .style(style::Container::Background)
+        .style(style::Container::Background.get_style())
         .into()
     }
     fn filter_package_lists(&mut self) {
@@ -937,45 +939,46 @@ fn error_view<'a>(
     content: Column<'a, Message, Theme, Renderer>,
     copy_confirmation: bool,
 ) -> Modal<'a, Message, Theme, Renderer> {
-    let title_ctn = container(
-        row![text("Failed to perform ADB operation").size(24)].align_items(Alignment::Center),
-    )
-    .width(Length::Fill)
-    .style(style::Container::Frame)
-    .padding([10, 0, 10, 0])
-    .center_y()
-    .center_x();
 
-    let modal_btn_row = row![
-        button(
-            text(if copy_confirmation {
-                "Copied!"
-            } else {
-                "Copy error"
-            })
+    let title_ctn = container(
+        row![text("Failed to perform ADB operation").size(24)].align_y(Alignment::Center),
+    )
+    .style(style::Container::Frame.get_style())
+    .padding([10, 0])
+    .center_y(Length::Shrink)
+    .center_x(Length::Fill);
+
+    let mut copy_button = button(
+        text(if copy_confirmation {
+            "Copied!"
+        } else {
+            "Copy error"
+        })
             .width(Length::Fill)
-            .horizontal_alignment(alignment::Horizontal::Center),
-        )
+            .align_x(alignment::Horizontal::Center),
+    )
         .width(Length::Fill)
         .on_press_maybe(if copy_confirmation {
             None
         } else {
             Some(Message::CopyError(error.to_string()))
-        })
-        .style(if copy_confirmation {
-            style::Button::Primary
-        } else {
-            style::Button::default()
-        }),
+        });
+    if copy_confirmation {
+        copy_button = copy_button.style(style::Button::Primary.get_style());
+    } else {
+        copy_button = copy_button.style(style::Button::get_default_style());
+    };
+    let modal_btn_row = row![
+        copy_button,
         button(
             text("Close")
                 .width(Length::Fill)
-                .horizontal_alignment(alignment::Horizontal::Center),
+                .align_x(alignment::Horizontal::Center),
         )
         .width(Length::Fill)
         .on_press(Message::ModalHide)
     ]
-    .padding([10, 0, 0, 0]);
+    .padding(padding::top(10));
 
     let text_box = scrollable(text(error).width(Length::Fill)).height(400);
 
@@ -983,7 +986,7 @@ fn error_view<'a>(
         .height(Length::Shrink)
         .max_height(700)
         .padding(10)
-        .style(style::Container::Frame);
+        .style(style::Container::Frame.get_style());
 
     Modal::new(content, ctn).on_blur(Message::ModalHide)
 }
@@ -991,24 +994,22 @@ fn error_view<'a>(
 fn waiting_view<'a>(
     displayed_text: &(impl ToString + ?Sized),
     btn: Option<button::Button<'a, Message, Theme, Renderer>>,
-    text_style: style::Text,
+    text_style: impl Fn(&Theme) -> iced::widget::text::Style + 'a,
 ) -> Element<'a, Message, Theme, Renderer> {
+
     let col = column![]
         .spacing(10)
-        .align_items(Alignment::Center)
+        .align_x(Alignment::Center)
         .push(text(displayed_text.to_string()).style(text_style).size(20));
 
     let col = match btn {
-        Some(btn) => col.push(btn.style(style::Button::Primary).padding([5, 10])),
+        Some(btn) => col.push(btn.style(style::Button::Primary.get_style()).padding([5, 10])),
         None => col,
     };
 
     container(col)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center_y()
-        .center_x()
-        .style(style::Container::default())
+        .center(Length::Fill)
+        .style(style::Container::get_default_style())
         .into()
 }
 
@@ -1017,7 +1018,7 @@ fn build_action_pkg_commands(
     device: &Phone,
     settings: &DeviceSettings,
     selection: (usize, usize),
-) -> Vec<Command<Message>> {
+) -> Vec<Task<Message>> {
     let pkg = &packages[selection.0][selection.1];
     let wanted_state = pkg.state.opposite(settings.disable_mode);
 
@@ -1045,7 +1046,7 @@ fn build_action_pkg_commands(
             };
             // In the end there is only one package state change
             // even if we run multiple adb commands
-            commands.push(Command::perform(
+            commands.push(Task::perform(
                 adb_shell_command(
                     // this is typically small,
                     // so it's fine.
@@ -1067,38 +1068,38 @@ fn build_action_pkg_commands(
 fn recap<'a>(settings: &Settings, recap: &SummaryEntry) -> Element<'a, Message, Theme, Renderer> {
     container(
         row![
-            text(recap.category).size(19).width(Length::FillPortion(1)),
+            text(recap.category.to_string()).size(19).width(Length::FillPortion(1)),
             vertical_rule(5),
             row![
                 if settings.device.disable_mode {
-                    text("Disable").style(style::Text::Danger)
+                    text("Disable")
                 } else {
-                    text("Uninstall").style(style::Text::Danger)
-                },
+                    text("Uninstall")
+                }.style(style::Text::Danger.get_style()),
                 horizontal_space(),
-                text(recap.discard.to_string()).style(style::Text::Danger)
+                text(recap.discard.to_string()).style(style::Text::Danger.get_style())
             ]
             .width(Length::FillPortion(1)),
             vertical_rule(5),
             row![
                 if settings.device.disable_mode {
-                    text("Enable").style(style::Text::Ok)
+                    text("Enable")
                 } else {
-                    text("Restore").style(style::Text::Ok)
-                },
+                    text("Restore")
+                }.style(style::Text::Ok.get_style()),
                 horizontal_space(),
-                text(recap.restore.to_string()).style(style::Text::Ok)
+                text(recap.restore.to_string()).style(style::Text::Ok.get_style())
             ]
             .width(Length::FillPortion(1))
         ]
         .spacing(20)
-        .padding([0, 10, 0, 0])
+        .padding(padding::right(10))
         .width(Length::Fill)
-        .align_items(Alignment::Center),
+        .align_y(Alignment::Center),
     )
     .padding(10)
     .width(Length::Fill)
     .height(45)
-    .style(style::Container::Frame)
+    .style(style::Container::Frame.get_style())
     .into()
 }

@@ -3,12 +3,13 @@
 use crate::core::{
     adb::{ACommand as AdbCommand, PmListPacksFlag},
     sync::User,
-    theme::Theme,
     uad_lists::{PackageHashMap, PackageState, Removal, UadList},
 };
 use crate::gui::widgets::package_row::PackageRow;
-use chrono::{DateTime, offset::Utc};
+use chrono::{offset::Utc, DateTime};
 use csv::Writer;
+use iced::Theme;
+use std::collections::HashMap;
 use std::{
     collections::HashSet,
     fmt, fs,
@@ -54,7 +55,7 @@ pub const fn is_all_w_c(s: &[u8]) -> bool {
 pub fn generate_backup_name<T>(t: DateTime<T>) -> String
 where
     T: chrono::TimeZone,
-    T::Offset: std::fmt::Display,
+    T::Offset: fmt::Display,
 {
     t.format("uninstalled_packages_%Y%m%d.csv").to_string()
 }
@@ -125,14 +126,8 @@ pub fn fetch_packages(
 }
 
 pub fn string_to_theme(theme: &str) -> Theme {
-    match theme {
-        "Dark" => Theme::Dark,
-        "Light" => Theme::Light,
-        "Lupin" => Theme::Lupin,
-        // Auto uses `Display`, so it doesn't have a canonical repr
-        t if t.starts_with("Auto") => Theme::Auto,
-        _ => Theme::default(),
-    }
+    let map: HashMap<String, Theme> = Theme::ALL.iter().map(|value| (value.to_string(), value.clone())).collect();
+    map.get(theme).map(|theme| theme.clone()).unwrap_or_default()
 }
 
 pub fn setup_uad_dir(dir: &Path) -> PathBuf {
@@ -213,13 +208,10 @@ impl fmt::Display for DisplayablePath {
                 error!("[PATH STEM]: No file stem found");
                 "[File steam not found]".to_string()
             },
-            |p| match p.to_os_string().into_string() {
-                Ok(stem) => stem,
-                Err(e) => {
-                    error!("[PATH ENCODING]: {e:?}");
-                    "[PATH ENCODING ERROR]".to_string()
-                }
-            },
+            |p| p.to_os_string().into_string().unwrap_or_else(|e| {
+                error!("[PATH ENCODING]: {e:?}");
+                "[PATH ENCODING ERROR]".to_string()
+            }),
         );
 
         write!(f, "{stem}")
@@ -273,7 +265,7 @@ mod tests {
     #[test]
     fn backup_name() {
         assert_eq!(
-            generate_backup_name(chrono::Utc.timestamp_millis_opt(0).unwrap()),
+            generate_backup_name(Utc.timestamp_millis_opt(0).unwrap()),
             "uninstalled_packages_19700101.csv".to_string()
         );
     }
